@@ -9,6 +9,30 @@
 - GitHub 리포지토리 연동 준비가 완료되었습니다.
 - API 키 설정이 필요합니다(현재 테스트 실행 시 API 키 오류 발생).
 
+## API 키 설정 방법
+
+실제 배포 환경에서는 다음과 같이 환경 변수를 설정해야 합니다:
+
+1. **API 키 발급**
+   - Google AI Studio(https://aistudio.google.com/)에 접속합니다.
+   - Google 계정으로 로그인합니다.
+   - "Get API key" 섹션으로 이동하여 새 API 키를 생성합니다.
+   - 생성된 키를 안전하게 보관합니다.
+
+2. **로컬 개발 환경**
+   - `.env` 파일에 유효한 API 키를 입력합니다.
+   ```
+   LLM_API_KEY="유효한_GEMINI_API_키"
+   ```
+
+3. **GitHub Actions를 통한 배포(선택사항)**
+   - GitHub 리포지토리의 Settings > Secrets > Actions에서 새 시크릿을 추가합니다.
+   - `LLM_API_KEY`라는 이름으로 API 키 값을 저장합니다.
+   - 워크플로우 파일에서 환경 변수로 참조합니다.
+
+4. **Vercel/Netlify 등 호스팅 서비스(선택사항)**
+   - 해당 호스팅 서비스의 환경 변수 설정에서 API 키를 설정합니다.
+
 ## GitHub 배포 단계
 
 1. **GitHub 리포지토리 생성**
@@ -26,24 +50,6 @@
    ```bash
    git push -u origin main
    ```
-
-## API 키 설정 방법
-
-실제 배포 환경에서는 다음과 같이 환경 변수를 설정해야 합니다:
-
-1. **로컬 개발 환경**
-   - `.env` 파일에 유효한 API 키를 입력합니다.
-   ```
-   LLM_API_KEY="유효한_GEMINI_API_키"
-   ```
-
-2. **GitHub Actions를 통한 배포(선택사항)**
-   - GitHub 리포지토리의 Settings > Secrets > Actions에서 새 시크릿을 추가합니다.
-   - `LLM_API_KEY`라는 이름으로 API 키 값을 저장합니다.
-   - 워크플로우 파일에서 환경 변수로 참조합니다.
-
-3. **Vercel/Netlify 등 호스팅 서비스(선택사항)**
-   - 해당 호스팅 서비스의 환경 변수 설정에서 API 키를 설정합니다.
 
 ## Gemini 2.5 Pro Preview 모델 특징
 

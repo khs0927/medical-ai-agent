@@ -42,7 +42,7 @@ AI_ANALYZER_API_KEY = os.getenv("AI_ANALYZER_API_KEY")
 # LLM Configuration
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-pro-preview-03-25")
 
 # API Call Settings
 DEFAULT_API_TIMEOUT = int(os.getenv("DEFAULT_API_TIMEOUT", "20")) # 초 단위
@@ -131,18 +131,14 @@ class MedicalAgent:
                 logger.error("Gemini 라이브러리 로드 실패. LLM 클라이언트 초기화 불가.")
                 return None
             if not self.llm_api_key:
-                logger.error("GEMINI_API_KEY가 설정되지 않았습니다. LLM 클라이언트 초기화 불가.")
+                logger.error("LLM_API_KEY가 설정되지 않았습니다. LLM 클라이언트 초기화 불가.")
                 return None
             try:
+                # 새로운 Gemini API 사용 방식
                 genai.configure(api_key=self.llm_api_key)
-                # 안전 설정 기본값 사용 (필요시 조정)
-                # safety_settings = [
-                #     {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                #     {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                #     {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                #     {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_MEDIUM_AND_ABOVE"},
-                # ]
-                model = genai.GenerativeModel(self.gemini_model_name) # safety_settings=safety_settings
+                
+                # 모델 초기화
+                model = genai.GenerativeModel(self.gemini_model_name)
                 logger.info(f"Gemini 클라이언트 초기화 완료 (모델: {self.gemini_model_name}).")
                 return model
             except Exception as e:
@@ -159,6 +155,176 @@ class MedicalAgent:
 
     def _call_backend_api(self, method: str, path: str, params: Optional[Dict] = None, data: Optional[Dict] = None) -> Dict[str, Any]:
         """AISecurityAnalyzer 백엔드 API를 호출하는 공통 함수 (재시도 포함)"""
+        
+        # 백엔드 API 호출 대신 모의 데이터 반환
+        if path == "/pubmed/search":
+            # PubMed 검색 모의 응답
+            query = params.get("query", "") if params else ""
+            max_results = params.get("max_results", 5) if params else 5
+            
+            mock_pubmed_results = {
+                "results": [
+                    {
+                        "id": "35672740",
+                        "title": "Heart Rate Variability and Clinical Outcomes in Patients With Cardiovascular Disease: A Systematic Review and Meta-Analysis",
+                        "authors": "Smith JB, Johnson KL, Park S, et al.",
+                        "journal": "Journal of the American Heart Association",
+                        "pubDate": "2022 Jun 1",
+                        "url": "https://pubmed.ncbi.nlm.nih.gov/35672740/",
+                        "abstract": "Heart rate variability (HRV) has emerged as a significant predictor of clinical outcomes in patients with cardiovascular disease. This systematic review and meta-analysis examined the relationship between HRV metrics and cardiovascular outcomes."
+                    },
+                    {
+                        "id": "36159323",
+                        "title": "Artificial Intelligence in Cardiology: Present and Future Applications",
+                        "authors": "Lee JH, Kim YS, Choi HW, et al.",
+                        "journal": "Korean Circulation Journal",
+                        "pubDate": "2023 Jan 15",
+                        "url": "https://pubmed.ncbi.nlm.nih.gov/36159323/",
+                        "abstract": "Recent advances in artificial intelligence (AI) have revolutionized various fields of medicine, including cardiology. This review focuses on the current and future applications of AI in cardiovascular medicine, including diagnosis, risk prediction, and treatment optimization."
+                    },
+                    {
+                        "id": "35984215",
+                        "title": "Current Management of Type 2 Diabetes: A Comprehensive Review",
+                        "authors": "Park JH, Kim MJ, Lee YS, et al.",
+                        "journal": "Diabetes & Metabolism Journal",
+                        "pubDate": "2022 Aug 10",
+                        "url": "https://pubmed.ncbi.nlm.nih.gov/35984215/",
+                        "abstract": "This comprehensive review examines the current evidence-based approaches to the management of type 2 diabetes, including pharmacological treatments, lifestyle modifications, and emerging therapies."
+                    }
+                ]
+            }
+            
+            return mock_pubmed_results
+            
+        elif path == "/semantic/search":
+            # 의미론적 검색 모의 응답
+            query = params.get("query", "") if params else ""
+            corpus_id = params.get("corpus_id", "medical_docs") if params else "medical_docs"
+            top_k = params.get("top_k", 3) if params else 3
+            
+            mock_semantic_results = {
+                "query": query,
+                "corpus_id": corpus_id,
+                "results": [
+                    {
+                        "id": "doc1",
+                        "title": "고혈압과 심장 질환의 연관성",
+                        "content": "고혈압은 심장 질환의 주요 위험 요소입니다. 지속적으로 혈압이 높으면 심장과 혈관에 더 많은 부담이 가해지게 됩니다.",
+                        "score": 0.92,
+                        "metadata": {
+                            "author": "Kim MD, Sang Ho",
+                            "year": 2022,
+                            "source": "Korean Journal of Cardiology"
+                        }
+                    },
+                    {
+                        "id": "doc2",
+                        "title": "심근경색: 증상 및 치료",
+                        "content": "심근경색의 주요 증상으로는 가슴 통증, 호흡 곤란, 발한, 현기증 등이 있습니다. 즉각적인 치료는 세 가지 주요 치료법인 혈전용해제, 관상동맥 중재시술, 관상동맥 우회술을 포함합니다.",
+                        "score": 0.85,
+                        "metadata": {
+                            "author": "Park MD, Ji Hoon",
+                            "year": 2023,
+                            "source": "International Cardiac Research"
+                        }
+                    },
+                    {
+                        "id": "doc3",
+                        "title": "심장 질환 예방을 위한 생활 습관",
+                        "content": "건강한 식습관, 규칙적인 운동, 스트레스 관리, 금연은 심장 질환 예방에 효과적입니다. 지중해식 식단이 심장 건강에 도움이 된다는 연구 결과가 있습니다.",
+                        "score": 0.78,
+                        "metadata": {
+                            "author": "Lee MD, Min Jung",
+                            "year": 2021,
+                            "source": "Preventive Medicine Journal"
+                        }
+                    }
+                ]
+            }
+            
+            return mock_semantic_results
+            
+        elif path == "/user/data":
+            # 사용자 데이터 모의 응답
+            user_id = params.get("user_id", "") if params else ""
+            
+            mock_user_data = {
+                "user_id": user_id,
+                "personal_info": {
+                    "age": 45,
+                    "gender": "male",
+                    "height": 175,
+                    "weight": 78
+                },
+                "vitals": {
+                    "heart_rate": 72,
+                    "blood_pressure": {
+                        "systolic": 125,
+                        "diastolic": 82
+                    },
+                    "oxygen_level": 98,
+                    "temperature": 36.5
+                },
+                "medical_history": {
+                    "conditions": ["Hypertension", "Type 2 Diabetes"],
+                    "allergies": ["Penicillin"],
+                    "surgeries": ["Appendectomy (2010)"],
+                    "family_history": ["Father: Heart Disease", "Mother: Hypertension"]
+                },
+                "medications": [
+                    {
+                        "name": "Lisinopril",
+                        "dosage": "10mg",
+                        "frequency": "Once daily"
+                    },
+                    {
+                        "name": "Metformin",
+                        "dosage": "500mg",
+                        "frequency": "Twice daily"
+                    }
+                ],
+                "lifestyle": {
+                    "smoking": "Former smoker (quit 5 years ago)",
+                    "alcohol": "Occasional",
+                    "exercise": "Moderate (3 times per week)",
+                    "diet": "Balanced, low sodium"
+                },
+                "recent_measurements": [
+                    {
+                        "date": "2025-04-20",
+                        "heart_rate": 75,
+                        "blood_pressure": {
+                            "systolic": 128,
+                            "diastolic": 84
+                        },
+                        "oxygen_level": 97
+                    },
+                    {
+                        "date": "2025-04-23",
+                        "heart_rate": 72,
+                        "blood_pressure": {
+                            "systolic": 125,
+                            "diastolic": 82
+                        },
+                        "oxygen_level": 98
+                    }
+                ],
+                "risk_assessment": {
+                    "cardiac_risk_score": 25,
+                    "stroke_risk_score": 18,
+                    "diabetes_complication_risk": "Moderate"
+                }
+            }
+            
+            return mock_user_data
+        
+        else:
+            # 기타 경로에 대한 모의 응답
+            logger.info(f"백엔드 API 호출 (모의 데이터): {method.upper()} {path}")
+            return {"status": "success_mock", "message": f"모의 데이터: {path} 경로에 대한 응답이 성공적으로 처리되었습니다."}
+
+        # 아래 코드는 실제 백엔드 API 호출 코드로, 모의 데이터 사용 시 실행되지 않습니다.
+        """
         url = f"{self.analyzer_endpoint_base}{path}"
         headers = {"Content-Type": "application/json"}
         if self.analyzer_api_key:
@@ -202,31 +368,19 @@ class MedicalAgent:
                     elif status_code == 404: error_status = "error_not_found"
                     return {"error": f"HTTP error: {status_code}", "details": error_details, "status": error_status}
                 # 5xx 오류는 재시도
-            except requests.exceptions.RequestException as e:
-                last_exception = e
-                logger.error(f"백엔드 API 연결 오류 ({method.upper()} {path}): {e}. 시도 {attempt + 1}/{self.api_retries + 1}")
-            except json.JSONDecodeError as e:
-                 last_exception = e
-                 logger.error(f"백엔드 API 응답 JSON 파싱 실패 ({method.upper()} {path}): {e}")
-                 # 파싱 실패는 재시도하지 않음
-                 return {"error": "Failed to parse API response JSON", "status": "error_json_parsing"}
             except Exception as e:
-                 last_exception = e
-                 logger.error(f"백엔드 API 호출 중 예상치 못한 오류 ({method.upper()} {path}): {e}. 시도 {attempt + 1}/{self.api_retries + 1}", exc_info=True)
-                 # 예상치 못한 오류는 재시도하지 않을 수 있음
-
-            # 재시도 전 대기
+                last_exception = e
+                logger.error(f"백엔드 API 호출 중 예외 발생 ({method.upper()} {path}): {e}. 시도 {attempt + 1}/{self.api_retries + 1}")
+            
+            # 마지막 시도가 아니면 지연 후 재시도
             if attempt < self.api_retries:
-                logger.info(f"{self.api_retry_delay}초 후 재시도...")
                 time.sleep(self.api_retry_delay)
-
-        # 모든 재시도 실패 시
-        logger.error(f"백엔드 API 호출 최종 실패 ({method.upper()} {path}) 후 {self.api_retries}회 재시도.")
-        error_msg = f"API call failed after {self.api_retries} retries: {last_exception}"
-        status = "error_timeout" if isinstance(last_exception, requests.exceptions.Timeout) else \
-                 "error_connection" if isinstance(last_exception, requests.exceptions.RequestException) else \
-                 "error_unexpected"
-        return {"error": error_msg, "status": status}
+        
+        # 모든 재시도 실패 후
+        logger.error(f"백엔드 API 호출 최종 실패 ({method.upper()} {path}). 모든 재시도 완료.")
+        error_msg = str(last_exception) if last_exception else "알 수 없는 오류"
+        return {"error": f"All retry attempts failed: {error_msg}", "status": "error_all_retries_failed"}
+        """
 
 
     # --- 도구 함수 구현 (백엔드 호출 방식) ---
@@ -316,26 +470,30 @@ class MedicalAgent:
         for attempt in range(self.api_retries + 1):
             try:
                 if self.llm_provider == "gemini":
+                    # Gemini 2.5 모델 API 호출
                     response = self.llm_client.generate_content(
                         prompt,
-                        generation_config={"temperature": temperature, "max_output_tokens": max_tokens}
-                        # safety_settings=... # 필요시 안전 설정 추가
+                        generation_config={
+                            "temperature": temperature, 
+                            "max_output_tokens": max_tokens,
+                            "top_p": 0.95,
+                            "top_k": 40
+                        }
                     )
-                    # 콘텐츠 필터링 확인 (Gemini)
-                    if not response.candidates:
-                         prompt_feedback = response.prompt_feedback if hasattr(response, 'prompt_feedback') else 'No feedback available'
-                         logger.warning(f"Gemini 응답 생성 실패 (콘텐츠 필터링 가능성). Feedback: {prompt_feedback}")
-                         # 필터링된 경우 재시도하지 않음 (프롬프트 수정 필요)
-                         raise MedicalAgentError(f"LLM content generation filtered. Feedback: {prompt_feedback}")
-
-                    # 응답 텍스트 추출 시 오류 확인
+                    
+                    # 응답 확인
                     if hasattr(response, 'text'):
                         logger.info("LLM 호출 성공.")
                         return response.text
                     else:
-                        # 이 경우는 보통 generate_content에서 예외가 발생하지만 방어적으로 추가
-                        logger.error(f"Gemini 응답에 'text' 속성이 없습니다. 응답: {response}")
-                        raise MedicalAgentError("LLM response missing 'text' attribute.")
+                        # 응답에 text 속성이 없는 경우
+                        if hasattr(response, 'prompt_feedback'):
+                            prompt_feedback = response.prompt_feedback
+                            logger.warning(f"Gemini 응답 생성 실패 (콘텐츠 필터링 가능성). Feedback: {prompt_feedback}")
+                            raise MedicalAgentError(f"LLM content generation filtered. Feedback: {prompt_feedback}")
+                        else:
+                            logger.error(f"Gemini 응답에 'text' 속성이 없습니다. 응답: {response}")
+                            raise MedicalAgentError("LLM response missing 'text' attribute.")
 
                 # elif self.llm_provider == "openai":
                     # OpenAI API 호출 로직
@@ -348,8 +506,7 @@ class MedicalAgent:
                  last_exception = e
                  break # 재시도 중단
             except Exception as e:
-                # API 오류, 네트워크 오류 등 재시도 가능 오류 처리 (Gemini 기준)
-                # google.api_core.exceptions.GoogleAPIError 등 구체적인 예외 처리 필요
+                # API 오류, 네트워크 오류 등 재시도 가능 오류 처리
                 last_exception = e
                 logger.error(f"LLM API 호출 중 오류 발생 ({self.llm_provider}). 시도 {attempt + 1}/{self.api_retries + 1}: {e}", exc_info=True)
 
