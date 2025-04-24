@@ -1,29 +1,49 @@
 # -*- coding: utf-8 -*-
 import logging
-from google.adk.agents import Agent
-
-from . import tools
-from . import prompts
+from langgraph.graph import StateGraph, END
+from .tools import (
+    ecg_analysis_tool,
+    risk_score_tool,
+    drug_interaction_tool,
+    guideline_summary_tool,
+    rag_query_tool,
+)
+from .schemas import ConsultationRequest, ConsultationResponse
+from .hf_client import qwen_chat, gemini_chat
 
 logger = logging.getLogger(__name__)
 
-# 메인 의료 에이전트 정의
-MedicalCoordinatorAgent = Agent(
-    name="MedicalCoordinatorAgent",
-    # Gemini 모델을 사용하여 사용자 요청 이해 및 도구 호출 조정
-    model="gemini-1.5-flash",
-    instruction=prompts.HEALTH_CONSULTATION_SYSTEM_PROMPT.format(context=""), # 기본 지침으로 건강 상담 프롬프트 사용
-    description="의료 관련 질문에 답하고 ECG 및 건강 데이터 분석 도구를 사용하는 조정 에이전트",
-    # 앞서 정의한 도구들을 에이전트가 사용할 수 있도록 추가
-    tools=[
-        tools.analyze_ecg_data_tool,
-        tools.analyze_health_risk_tool
-        # 필요시 다른 도구 추가 (예: 웹 검색, 약물 정보 조회 등)
-    ],
-    # 에이전트가 도구 사용 외 일반적인 답변도 할 수 있도록 설정
-    enable_default_response=True,
-    # 디버깅을 위한 로그 활성화 (선택 사항)
-    verbose=True
-)
+def _planner(state):
+    """1단계: 요청 의도 파악 → 사용할 tool 리스트 반환"""
+    question = state["question"]
+    if "약물" in question or "drug" in question:
+        return {"tool": "drug_interaction_tool"}
+    if "가이드라인" in question:
+        return {"tool": "guideline_summary_tool"}
+    if any(k in question for k in ("위험", "risk", "심박")):
+        return {"tool": "risk_score_tool"}
+    return {"tool": "rag_query_tool"}
 
-logger.info(f"{MedicalCoordinatorAgent.name} 에이전트 정의됨.") 
+graph = StateGraph()
+graph.add_node("plan", _planner)
+graph.add_node("drug_interaction_tool", drug_interaction_tool)
+graph.add_node("guideline_summary_tool", guideline_summary_tool)
+graph.add_node("risk_score_tool", risk_score_tool)
+graph.add_node("rag_query_tool", rag_query_tool)
+
+graph.add_edge("plan", "drug_interaction_tool", condition=lambda s: s["tool"]=="drug_interaction_tool")
+graph.add_edge("plan", "guideline_summary_tool", condition=lambda s: s["tool"]=="guideline_summary_tool")
+graph.add_edge("plan", "risk_score_tool", condition=lambda s: s["tool"]=="risk_score_tool")
+graph.add_edge("plan", "rag_query_tool", condition=lambda s: s["tool"]=="rag_query_tool")
+graph.add_edge("drug_interaction_tool", END)
+graph.add_edge("guideline_summary_tool", END)
+graph.add_edge("risk_score_tool", END)
+graph.add_edge("rag_query_tool", END)
+
+consultation_agent = graph.compile()
+
+def consult(req: ConsultationRequest) -> ConsultationResponse:
+    result = consultation_agent.invoke({"question": req.question})
+    return ConsultationResponse(answer=result["output"])
+
+logger.info("LangGraph 기반 의료 에이전트 정의됨.") 

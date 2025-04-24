@@ -2,57 +2,38 @@
 # Project metadata. Available keys are documented at:
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata
 
-name = "google-adk"
-description = "Agent Development Kit"
+name = "medical-ai-agent"
+version = "1.0.0"
+description = "Medical AI Agent with LangGraph FSM"
 readme = "README.md"
 requires-python = ">=3.9"
 license = { file = "LICENSE" }
-authors = [{ name = "Google LLC", email = "googleapis-packages@google.com" }]
-classifiers = [ # List of https://pypi.org/classifiers/
-  "Typing :: Typed",
-  "Intended Audience :: Developers",
-  "Intended Audience :: Science/Research",
-  "Programming Language :: Python",
+authors = [{ name = "Health Platform Team" }]
+classifiers = [
+  "Intended Audience :: Healthcare Industry",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.13",
-  "Programming Language :: Python :: 3.12",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
   "Operating System :: OS Independent",
-  "Topic :: Software Development :: Libraries :: Python Modules",
   "License :: OSI Approved :: Apache Software License",
 ]
 dependencies = [
-  # go/keep-sorted start
-  "authlib>=1.5.1",                          # For RestAPI Tool
-  "click>=8.1.8",                            # For CLI tools
-  "fastapi>=0.115.0",                        # FastAPI framework
-  "google-api-python-client>=2.157.0",       # Google API client discovery
-  "google-cloud-aiplatform>=1.87.0",         # For VertexAI integrations, e.g. example store.
-  "google-cloud-secret-manager>=2.22.0",     # Fetching secrets in RestAPI Tool
-  "google-cloud-speech>=2.30.0",             # For Audo Transcription
-  "google-cloud-storage>=2.18.0, <3.0.0",    # For GCS Artifact service
-  "google-genai>=1.11.0",                    # Google GenAI SDK
-  "graphviz>=0.20.2",                        # Graphviz for graph rendering
-  "mcp>=1.5.0;python_version>='3.10'",       # For MCP Toolset
-  "opentelemetry-api>=1.31.0",               # OpenTelemetry
-  "opentelemetry-exporter-gcp-trace>=1.9.0",
-  "opentelemetry-sdk>=1.31.0",
-  "pydantic>=2.0, <3.0.0",                   # For data validation/models
-  "python-dotenv>=1.0.0",                    # To manage environment variables
-  "PyYAML>=6.0.2",                           # For APIHubToolset.
-  "requests>=2.30.0",                         # For making HTTP requests (added for HF client)
-  "sqlalchemy>=2.0",                         # SQL database ORM
-  "tzlocal>=5.3",                            # Time zone utilities
-  "uvicorn>=0.34.0",                         # ASGI server for FastAPI
-  # go/keep-sorted end
+  # Essential dependencies
+  "fastapi>=0.111.0",
+  "uvicorn>=0.29.0",
+  "google-generativeai>=0.5.0",
+  "huggingface-hub>=0.21.4",
+  "weaviate-client>=4.5.2",
+  "langgraph>=0.0.28",
+  "pydantic>=2.7.1",
+  "httpx>=0.27.0",
 ]
 dynamic = ["version"]
 
 [project.urls]
 homepage = "https://google.github.io/adk-docs/"
-repository = "https://github.com/google/adk-python"
+repository = "https://github.com/khs0927/medical-ai-agent"
 changelog = "https://github.com/google/adk-python/blob/main/CHANGELOG.md"
 documentation = "https://google.github.io/adk-docs/"
 
@@ -60,14 +41,11 @@ documentation = "https://google.github.io/adk-docs/"
 adk = "google.adk.cli:main"
 
 [project.optional-dependencies]
-
 dev = [
-  # go/keep-sorted start
-  "flit>=3.10.0",
-  "isort>=6.0.0",
-  "pyink>=24.10.0",
-  "pylint>=2.6.0",
-  # go/keep-sorted end
+  "pytest>=8.0.0",
+  "pytest-asyncio>=0.25.0",
+  "ruff>=0.3.0",
+  "black>=24.0.0",
 ]
 
 eval = [
@@ -125,8 +103,8 @@ pyink-use-majority-quotes = true
 [build-system]
 # Build system specify which backend is used to build/install the project (flit,
 # poetry, setuptools,...). All backends are supported by `pip install`
-requires = ["flit_core >=3.8,<4"]
-build-backend = "flit_core.buildapi"
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
 
 [tool.flit.sdist]
 include = ['src/**/*', 'README.md', 'pyproject.toml', 'LICENSE']
@@ -147,4 +125,4 @@ line_length = 200
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-asyncio_default_fixture_loop_scope = "function"
+asyncio_mode = "auto"
