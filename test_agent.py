@@ -33,7 +33,7 @@ def start_server():
     print("서버를 시작합니다...")
     # 백그라운드에서 서버 실행
     server_process = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "src.medical_agent:app", "--reload", "--port", "8000"],
+        [sys.executable, "-m", "uvicorn", "src.medical_agent.__main__:app", "--reload", "--port", "8000"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         preexec_fn=os.setsid if os.name != 'nt' else None,
