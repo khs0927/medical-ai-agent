@@ -1,194 +1,62 @@
-# AI Helper Medical Diagnosis System
+# 의료 에이전트
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/downloads/)
-[![Google ADK](https://img.shields.io/badge/Google-ADK-green)](https://github.com/google/adk-python)
-[![Hugging Face](https://img.shields.io/badge/Hugging%20Face-API-yellow)](https://huggingface.co/inference-api)
+의료 상담을 위한 AI 에이전트 시스템입니다.
 
-AI Helper Medical Diagnosis System is a cardiovascular diagnosis and health consultation AI agent based on Google's Agent Development Kit (ADK) and Hugging Face's specialized medical models. It analyzes user health data and provides professional medical information.
+## 기능
 
-<p align="center">
-  <img src="assets/agent-development-kit.png" width="200" />
-</p>
+- ECG 데이터 분석
+- 위험도 평가
+- 약물 상호작용 분석
+- 가이드라인 요약
+- RAG 기반 의료 지식 검색
 
-## ✨ Features
+## 설치
 
-- **Cardiovascular Health Data Analysis**: Analyzes ECG data, heart rate, blood pressure, and other biometric data
-- **Personalized Health Risk Assessment**: Evaluates cardiovascular risk based on user information and health metrics
-- **Professional Health Consultation**: Provides accurate and reliable responses to health questions
-- **User-friendly Interface**: Easy interaction through Google ADK's web interface
-- **PubMed/Kaggle Integration**: Search and reference latest medical research and datasets
-- **Safe and Responsible AI**: Prioritizes medical accuracy and provides clear disclaimers
-
-## 🔧 Installation and Setup
-
-### Requirements
-
-- Python 3.9 or higher
-- [Google ADK](https://github.com/google/adk-python)
-- Hugging Face API key
-
-### Installation Steps
-
-1. Clone the repository
-
+1. 저장소 클론:
 ```bash
-git clone https://github.com/your-username/medical-agent-system.git
-cd medical-agent-system
+git clone https://github.com/yourusername/medical-agent.git
+cd medical-agent
 ```
 
-2. Create and activate a virtual environment
-
+2. 가상환경 생성 및 활성화:
 ```bash
 python -m venv venv
-source venv/bin/activate  # Windows: venv\Scripts\activate
+source venv/bin/activate  # Linux/Mac
+venv\Scripts\activate     # Windows
 ```
 
-3. Install dependencies
-
+3. 의존성 설치:
 ```bash
 pip install -r requirements.txt
 ```
 
-4. Set up environment variables
-
+4. 환경 변수 설정:
 ```bash
 cp .env.example .env
-# Edit the .env file to configure necessary API keys
+# .env 파일을 편집하여 필요한 API 키 등을 설정
 ```
 
-## 📚 Usage
-
-### Basic Usage
-
-1. Run ADK development UI:
+## 실행
 
 ```bash
-adk dev ./src/medical_agent
+python -m src.medical_agent
 ```
 
-2. Access http://localhost:8080 in your web browser
+서버가 http://localhost:8000 에서 실행됩니다.
 
-3. Start your medical consultation!
+## API 엔드포인트
 
-### Command Line Usage:
+- `GET /healthz`: 서버 상태 확인
+- `POST /v1/consult`: 의료 상담 요청
+
+### 상담 요청 예시
 
 ```bash
-python -m agent "What are the symptoms of a heart attack?"
+curl -X POST "http://localhost:8000/v1/consult" \
+     -H "Content-Type: application/json" \
+     -d '{"question": "아스피린과 와파린을 같이 복용해도 될까요?"}'
 ```
 
-### Programmatic Usage:
+## 라이선스
 
-```python
-from medical_agent.agents import MedicalCoordinatorAgent
-
-# Initialize the agent
-agent = MedicalCoordinatorAgent
-
-# Process a query
-response = agent.process("What should I do to improve my heart health?")
-print(response)
-```
-
-## 🔄 Integration with NotToday App
-
-AI Helper Medical Diagnosis System integrates seamlessly with the NotToday app.
-
-### Integration Method
-
-1. NotToday Server Setup:
-   - Connect to AI Helper medical system through the `/analysis/consultation` endpoint
-   - Configure proper API keys and endpoints in the `.env` file
-
-2. NotToday Client Setup:
-   - Configure client's `/api/analysis/consultation` calls to route to the AI Helper endpoint on the server
-
-### Example Code
-
-**NotToday Server Route Setup (Node.js/Express):**
-
-```javascript
-// NotToday/server/routes.ts
-import { Router } from 'express';
-import { AnalysisController } from '../controllers/AnalysisController';
-
-const router = Router();
-
-// AI Helper consultation endpoint
-router.post('/analysis/consultation', AnalysisController.handleAIConsultation);
-
-export default router;
-```
-
-**AI Helper Agent Call (Server Side):**
-
-```javascript
-// NotToday/server/controllers/AnalysisController.ts
-import { MedicalAgentClient } from '../services/MedicalAgentClient';
-
-export class AnalysisController {
-  static async handleAIConsultation(req, res) {
-    try {
-      const { message, userId } = req.body;
-      
-      // Call AI Helper agent
-      const response = await MedicalAgentClient.processMedicalQuery(message, userId);
-      
-      res.json({ aiResponse: response });
-    } catch (error) {
-      console.error('AI Helper consultation error:', error);
-      res.status(500).json({ error: 'Error processing AI consultation.' });
-    }
-  }
-}
-```
-
-## 📜 License
-
-This project is distributed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
-
-## ⚠️ Disclaimer
-
-This system is for educational and informational purposes only. Always consult with a healthcare professional for serious health concerns. Information generated by AI cannot substitute for actual medical advice.
-
-## 제미니 2.5 프로 API 사용 가이드
-
-이 프로젝트는 Google의 최신 AI 모델인 Gemini 2.5 Pro를 사용합니다. 
-
-### API 키 발급 방법
-
-1. [Google AI Studio](https://aistudio.google.com/)에 접속
-2. Google 계정으로 로그인
-3. "Get API key" 섹션으로 이동하여 새 API 키 생성
-4. 생성된 키를 `.env` 파일의 `LLM_API_KEY` 값으로 설정
-
-### 모델 특징
-
-- 코딩, 추론, 멀티모달 이해에 최적화된 성능
-- 복잡한 의료 문제에 대한 더 정확한, 근거 기반 추론
-- 대규모 의료 데이터셋, 환자 기록, 의학 문헌 분석을 위한 향상된 컨텍스트 처리
-
-### 요금 정보 (2025년 4월 기준)
-
-- 200K 토큰 이하: 입력 $1.25 / 백만 토큰, 출력 $10.00 / 백만 토큰
-- 200K 토큰 초과: 입력 $2.50 / 백만 토큰, 출력 $15.00 / 백만 토큰
-- 요청 제한: 150 RPM (분당 요청 수)
-- 무료 계정: 5 RPM, 하루 25회 요청
-
-## 사용 방법
-
-```python
-from agent import MedicalAgent
-
-# 에이전트 초기화
-agent = MedicalAgent()
-
-# 질의응답
-response = agent.process_query("심장병의 주요 증상은 무엇인가요?")
-print(response)
-```
-
-## 주의사항
-
-- 이 프로젝트는 의료 정보 제공을 위한 참고용이며, 실제 의료 진단/처방을 대체할 수 없습니다.
-- 실제 의료 환경에서 사용하기 전에 충분한 검증이 필요합니다.
-- API 키는 안전하게 관리하고, 소스 코드에 직접 포함하지 마세요. 
+MIT License 

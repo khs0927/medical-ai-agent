@@ -1,44 +1,40 @@
 # -*- coding: utf-8 -*-
 import logging
-from langgraph.graph import StateGraph, END
-from .tools import (
+from typing import Dict, Any
+from langgraph.graph import StateGraph, END, START
+from src.medical_agent.tools import (
     ecg_analysis_tool,
     risk_score_tool,
     drug_interaction_tool,
     guideline_summary_tool,
     rag_query_tool,
 )
-from .schemas import ConsultationRequest, ConsultationResponse
-from .hf_client import qwen_chat, gemini_chat
+from src.medical_agent.schemas import ConsultationRequest, ConsultationResponse, ConsultationState
+from src.medical_agent.hf_client import qwen_chat, gemini_chat
 
 logger = logging.getLogger(__name__)
 
-def _planner(state):
+def _planner(state: Dict[str, Any]) -> Dict[str, Any]:
     """1단계: 요청 의도 파악 → 사용할 tool 리스트 반환"""
     question = state["question"]
+    
     if "약물" in question or "drug" in question:
-        return {"tool": "drug_interaction_tool"}
-    if "가이드라인" in question:
-        return {"tool": "guideline_summary_tool"}
-    if any(k in question for k in ("위험", "risk", "심박")):
-        return {"tool": "risk_score_tool"}
-    return {"tool": "rag_query_tool"}
+        state["output"] = drug_interaction_tool(state)["output"]
+    elif "가이드라인" in question:
+        state["output"] = guideline_summary_tool(state)["output"]
+    elif any(k in question for k in ("위험", "risk", "심박")):
+        state["output"] = risk_score_tool(state)["output"]
+    else:
+        state["output"] = rag_query_tool(state)["output"]
+    
+    return state
 
-graph = StateGraph()
+graph = StateGraph(state_schema=ConsultationState)
 graph.add_node("plan", _planner)
-graph.add_node("drug_interaction_tool", drug_interaction_tool)
-graph.add_node("guideline_summary_tool", guideline_summary_tool)
-graph.add_node("risk_score_tool", risk_score_tool)
-graph.add_node("rag_query_tool", rag_query_tool)
 
-graph.add_edge("plan", "drug_interaction_tool", condition=lambda s: s["tool"]=="drug_interaction_tool")
-graph.add_edge("plan", "guideline_summary_tool", condition=lambda s: s["tool"]=="guideline_summary_tool")
-graph.add_edge("plan", "risk_score_tool", condition=lambda s: s["tool"]=="risk_score_tool")
-graph.add_edge("plan", "rag_query_tool", condition=lambda s: s["tool"]=="rag_query_tool")
-graph.add_edge("drug_interaction_tool", END)
-graph.add_edge("guideline_summary_tool", END)
-graph.add_edge("risk_score_tool", END)
-graph.add_edge("rag_query_tool", END)
+# 엣지 추가
+graph.add_edge(START, "plan")
+graph.add_edge("plan", END)
 
 consultation_agent = graph.compile()
 

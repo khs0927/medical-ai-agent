@@ -27,6 +27,15 @@ except ImportError:
     logger.warning("Gemini 라이브러리(google-generativeai)가 설치되지 않았습니다. LLM 기능이 제한됩니다.")
     google_ai_available = False
 
+# MedLLaMA 라이브러리 로드 시도
+try:
+    import torch
+    from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+    medllama_available = True
+except ImportError:
+    logger.warning("MedLLaMA 관련 라이브러리(torch, transformers)가 설치되지 않았습니다. MedLLaMA 기능이 제한됩니다.")
+    medllama_available = False
+
 # (선택) xmltodict 설치 시 사용 가능
 # try:
 #     import xmltodict
@@ -43,6 +52,11 @@ AI_ANALYZER_API_KEY = os.getenv("AI_ANALYZER_API_KEY")
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini")
 LLM_API_KEY = os.getenv("LLM_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-pro-preview-03-25")
+
+# MedLLaMA 설정
+MEDLLAMA_MODEL_NAME = os.getenv("MEDLLAMA_MODEL_NAME", "JSL-MedLlama-3-8B-v2.0")
+MEDLLAMA_MODEL_PATH = os.getenv("MEDLLAMA_MODEL_PATH", "")
+MEDLLAMA_DEVICE = os.getenv("MEDLLAMA_DEVICE", "cuda")
 
 # API Call Settings
 DEFAULT_API_TIMEOUT = int(os.getenv("DEFAULT_API_TIMEOUT", "20")) # 초 단위
@@ -78,13 +92,17 @@ class MedicalAgent:
         self.llm_provider = LLM_PROVIDER
         self.llm_api_key = LLM_API_KEY
         self.gemini_model_name = GEMINI_MODEL_NAME
+        self.medllama_model_name = MEDLLAMA_MODEL_NAME
+        self.medllama_model_path = MEDLLAMA_MODEL_PATH
+        self.medllama_device = MEDLLAMA_DEVICE
         self.api_timeout = DEFAULT_API_TIMEOUT
         self.api_retries = DEFAULT_API_RETRIES
         self.api_retry_delay = DEFAULT_API_RETRY_DELAY
 
         # LLM 클라이언트 초기화
-        self.llm_client = self._initialize_llm_client()
-        self.llm_available = self.llm_client is not None
+        self.llm_clients = {}
+        self.initialize_llm_client()
+        self.llm_available = len(self.llm_clients) > 0
 
         # 사용 가능한 도구 목록 (LLM이 계획 수립 시 참고)
         # 설명에는 각 도구가 어떤 백엔드 API를 호출하는지 명시하는 것이 좋음
@@ -124,32 +142,150 @@ class MedicalAgent:
         logger.info(f"사용 가능한 도구: {list(self.available_tools.keys())}")
         logger.info("MedicalAgent 초기화 완료.")
 
-    def _initialize_llm_client(self):
-        """선택된 LLM 제공자에 따라 클라이언트 초기화"""
-        if self.llm_provider == "gemini":
-            if not google_ai_available:
-                logger.error("Gemini 라이브러리 로드 실패. LLM 클라이언트 초기화 불가.")
-                return None
-            if not self.llm_api_key:
-                logger.error("LLM_API_KEY가 설정되지 않았습니다. LLM 클라이언트 초기화 불가.")
-                return None
-            try:
-                # 새로운 Gemini API 사용 방식
-                genai.configure(api_key=self.llm_api_key)
-                
-                # 모델 초기화
-                model = genai.GenerativeModel(self.gemini_model_name)
-                logger.info(f"Gemini 클라이언트 초기화 완료 (모델: {self.gemini_model_name}).")
-                return model
-            except Exception as e:
-                logger.error(f"Gemini 클라이언트 초기화 중 오류 발생: {e}", exc_info=True)
-                return None
-        # elif self.llm_provider == "openai":
-            # OpenAI 클라이언트 초기화 로직
-            # pass
+    def initialize_llm_client(self) -> bool:
+        """LLM 클라이언트 초기화
+        
+        Returns:
+            초기화 성공 여부
+        """
+        # LLM 사용 환경 설정
+        self.llm_provider = os.getenv("LLM_PROVIDER", "gemini").lower()  # 'gemini', 'medllama', 'hybrid'
+        self.primary_llm = os.getenv("LLM_PRIMARY", self.llm_provider).lower()
+        
+        self.llm_clients = {}
+        self.llm_available = False
+        
+        logger.info(f"LLM 제공자 구성: {self.llm_provider} (기본 모델: {self.primary_llm})")
+        
+        # API 키 로드
+        self.llm_api_key = os.getenv("LLM_API_KEY", "")
+        
+        # MedLLaMA 설정
+        self.medllama_model_name = os.getenv("MEDLLAMA_MODEL_NAME", "medllama-3-8b")
+        self.medllama_model_path = os.getenv("MEDLLAMA_MODEL_PATH", "./models/medllama")
+        self.medllama_device = os.getenv("MEDLLAMA_DEVICE", "cuda" if torch.cuda.is_available() else "cpu")
+        
+        # 재시도 설정
+        self.api_retries = int(os.getenv("LLM_API_RETRIES", "2"))
+        self.api_retry_delay = float(os.getenv("LLM_API_RETRY_DELAY", "1.5"))
+        
+        # LLM 클라이언트 초기화
+        llm_initialized = False
+        
+        # Gemini 모델 초기화 (gemini 또는 hybrid 모드)
+        if self.llm_provider in ["gemini", "hybrid"]:
+            llm_initialized |= self._initialize_gemini_client()
+        
+        # MedLLaMA 모델 초기화 (medllama 또는 hybrid 모드)
+        if self.llm_provider in ["medllama", "hybrid"]:
+            llm_initialized |= self._initialize_medllama_client()
+        
+        # 초기화 결과 확인
+        self.llm_available = llm_initialized
+        if not self.llm_available:
+            logger.warning("LLM 클라이언트 초기화 실패 (API 키 및 모델 경로 확인 필요)")
         else:
-            logger.error(f"지원하지 않는 LLM Provider: {self.llm_provider}")
-            return None
+            logger.info(f"LLM 클라이언트 초기화 완료. 사용 가능한 모델: {', '.join(self.llm_clients.keys())}")
+            
+            # 기본 LLM이 초기화되지 않은 경우 대체 모델로 설정
+            if self.primary_llm not in self.llm_clients:
+                # 사용 가능한 첫 번째 모델을 기본값으로 설정
+                if self.llm_clients:
+                    self.primary_llm = list(self.llm_clients.keys())[0]
+                    logger.warning(f"기본 LLM이 초기화되지 않아 대체 모델로 변경: {self.primary_llm}")
+        
+        return self.llm_available
+
+    def _initialize_gemini_client(self) -> bool:
+        """Gemini API 클라이언트 초기화
+        
+        Returns:
+            초기화 성공 여부
+        """
+        try:
+            # API 키 확인
+            if not self.llm_api_key:
+                logger.warning("Gemini API 키가 제공되지 않았습니다. LLM_API_KEY 환경 변수를 설정하세요.")
+                return False
+            
+            # Gemini 모델 설정
+            self.gemini_model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-pro-preview-03-25")
+            
+            # Gemini API 클라이언트 초기화
+            genai.configure(api_key=self.llm_api_key)
+            
+            # Gemini 모델 생성
+            model = genai.GenerativeModel(self.gemini_model_name)
+            self.llm_clients["gemini"] = model
+            logger.info(f"Gemini API 클라이언트 초기화 완료 (모델: {self.gemini_model_name})")
+            
+            return True
+        
+        except Exception as e:
+            logger.error(f"Gemini API 클라이언트 초기화 실패: {e}", exc_info=True)
+            return False
+
+    def _initialize_medllama_client(self) -> bool:
+        """MedLLaMA 모델 초기화
+        
+        Returns:
+            초기화 성공 여부
+        """
+        try:
+            # 모델 경로 확인
+            if not os.path.exists(self.medllama_model_path):
+                logger.warning(f"MedLLaMA 모델 경로를 찾을 수 없습니다: {self.medllama_model_path}")
+                return False
+            
+            # MedLLaMA 모델 로드
+            from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+            
+            # 로그 설정
+            logger.info(f"MedLLaMA 모델 로드 중 ({self.medllama_model_name}) - 경로: {self.medllama_model_path}")
+            logger.info(f"사용 장치: {self.medllama_device}")
+            
+            # 양자화 설정 (선택적으로 메모리 사용량 줄이기)
+            use_quantization = os.getenv("MEDLLAMA_USE_QUANTIZATION", "False").lower() == "true"
+            quantization_config = None
+            
+            if use_quantization and self.medllama_device == "cuda":
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True
+                )
+                logger.info("4비트 양자화 사용 활성화")
+            
+            # 토크나이저 로드
+            tokenizer = AutoTokenizer.from_pretrained(
+                self.medllama_model_path,
+                trust_remote_code=True
+            )
+            
+            # 모델 로드
+            device_map = "auto" if self.medllama_device == "cuda" else None
+            model = AutoModelForCausalLM.from_pretrained(
+                self.medllama_model_path,
+                device_map=device_map,
+                quantization_config=quantization_config,
+                trust_remote_code=True,
+                torch_dtype=torch.float16 if self.medllama_device == "cuda" else torch.float32
+            )
+            
+            # 모델 및 토크나이저 저장
+            self.llm_clients["medllama"] = {
+                "model": model,
+                "tokenizer": tokenizer
+            }
+            
+            # 모델이 올바르게 로드되었는지 확인
+            logger.info(f"MedLLaMA 모델 초기화 완료: {model.config.model_type}, 매개변수: {model.num_parameters()}")
+            return True
+        
+        except Exception as e:
+            logger.error(f"MedLLaMA 모델 초기화 실패: {e}", exc_info=True)
+            return False
 
     # --- Helper Function for Backend API Calls ---
 
@@ -459,65 +595,283 @@ class MedicalAgent:
     # --- LLM 연동 함수 ---
 
     def _call_llm(self, prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> Optional[str]:
-        """LLM API를 호출하여 응답 생성 (재시도 포함)"""
-        if not self.llm_available or self.llm_client is None:
-            logger.warning("LLM 기능 사용 불가 (API 키 또는 클라이언트 문제).")
+        """LLM 모델 호출 및 응답 생성
+        
+        Args:
+            prompt: 모델에 전달할 프롬프트 문자열
+            temperature: 응답 다양성 조절 (0-1)
+            max_tokens: 최대 생성 토큰 수
+            
+        Returns:
+            생성된 응답 텍스트 또는 오류 시 None
+        """
+        if not self.llm_available:
+            error_msg = "사용 가능한 LLM 클라이언트가 없습니다."
+            logger.error(error_msg)
             return None
-
-        logger.debug(f"LLM 호출 시작. Provider: {self.llm_provider}, Model: {self.gemini_model_name}")
-        last_exception = None
-
-        for attempt in range(self.api_retries + 1):
+        
+        # 최대 재시도 횟수
+        max_retries = 2
+        
+        # 하이브리드 모드인 경우 통합 호출 처리
+        if self.llm_provider == "hybrid" and "medllama" in self.llm_clients and "gemini" in self.llm_clients:
+            logger.info("하이브리드 LLM 모드로 응답 생성 시도")
+            return self._hybrid_llm_call(prompt, temperature, max_tokens)
+        
+        # 기본 LLM 호출 로직
+        for attempt in range(max_retries + 1):
             try:
-                if self.llm_provider == "gemini":
-                    # Gemini 2.5 모델 API 호출
-                    response = self.llm_client.generate_content(
-                        prompt,
-                        generation_config={
-                            "temperature": temperature, 
-                            "max_output_tokens": max_tokens,
-                            "top_p": 0.95,
-                            "top_k": 40
-                        }
+                # 현재 기본 LLM으로 지정된 모델 사용
+                if self.primary_llm == "gemini" and "gemini" in self.llm_clients:
+                    # Gemini 모델 사용
+                    gemini_model = self.llm_clients["gemini"]
+                    generation_config = {
+                        "temperature": temperature,
+                        "top_p": 0.95,
+                        "top_k": 40,
+                        "max_output_tokens": max_tokens
+                    }
+                    
+                    response = gemini_model.generate_content(prompt, generation_config=generation_config)
+                    
+                    # 응답 검증
+                    if hasattr(response, 'text') and response.text.strip():
+                        return response.text.strip()
+                    else:
+                        logger.warning("Gemini API에서 비어있거나 유효하지 않은 응답을 반환했습니다.")
+                        
+                elif self.primary_llm == "medllama" and "medllama" in self.llm_clients:
+                    # MedLLaMA 모델 사용
+                    medllama_client = self.llm_clients["medllama"]
+                    model = medllama_client["model"]
+                    tokenizer = medllama_client["tokenizer"]
+                    
+                    response = self._generate_medllama_response(
+                        prompt, model, tokenizer, temperature, max_tokens
                     )
                     
-                    # 응답 확인
-                    if hasattr(response, 'text'):
-                        logger.info("LLM 호출 성공.")
-                        return response.text
+                    if response and response.strip():
+                        return response.strip()
                     else:
-                        # 응답에 text 속성이 없는 경우
-                        if hasattr(response, 'prompt_feedback'):
-                            prompt_feedback = response.prompt_feedback
-                            logger.warning(f"Gemini 응답 생성 실패 (콘텐츠 필터링 가능성). Feedback: {prompt_feedback}")
-                            raise MedicalAgentError(f"LLM content generation filtered. Feedback: {prompt_feedback}")
-                        else:
-                            logger.error(f"Gemini 응답에 'text' 속성이 없습니다. 응답: {response}")
-                            raise MedicalAgentError("LLM response missing 'text' attribute.")
-
-                # elif self.llm_provider == "openai":
-                    # OpenAI API 호출 로직
-                    # pass
+                        logger.warning("MedLLaMA 모델에서 비어있거나 유효하지 않은 응답을 반환했습니다.")
                 else:
-                    logger.error(f"지원하지 않는 LLM Provider: {self.llm_provider}")
-                    return None # 지원하지 않는 제공자는 재시도 의미 없음
-
-            except MedicalAgentError as e: # 콘텐츠 필터링 등 재시도 불필요 오류
-                 last_exception = e
-                 break # 재시도 중단
+                    logger.error(f"지원하지 않는 LLM 제공자: {self.primary_llm}")
+                    return None
+                
             except Exception as e:
-                # API 오류, 네트워크 오류 등 재시도 가능 오류 처리
-                last_exception = e
-                logger.error(f"LLM API 호출 중 오류 발생 ({self.llm_provider}). 시도 {attempt + 1}/{self.api_retries + 1}: {e}", exc_info=True)
-
-            # 재시도 전 대기
-            if attempt < self.api_retries:
-                logger.info(f"{self.api_retry_delay}초 후 LLM 호출 재시도...")
-                time.sleep(self.api_retry_delay)
-
-        # 모든 재시도 실패 시
-        logger.error(f"LLM API 호출 최종 실패 후 {self.api_retries}회 재시도. 마지막 오류: {last_exception}")
+                if attempt < max_retries:
+                    retry_delay = 1.5 ** attempt  # 지수 백오프
+                    logger.warning(f"LLM 호출 중 오류 발생 (시도 {attempt+1}/{max_retries+1}): {e}. {retry_delay}초 후 재시도...")
+                    time.sleep(retry_delay)
+                else:
+                    logger.error(f"LLM 호출 최대 재시도 횟수 초과. 마지막 오류: {e}", exc_info=True)
+                    return None
+                
         return None
+
+    def _generate_medllama_response(self, prompt: str, model, tokenizer, temperature: float = 0.7, max_tokens: int = 2048) -> Optional[str]:
+        """MedLLaMA 모델을 사용하여 응답 생성
+        
+        Args:
+            prompt: 프롬프트 텍스트
+            model: 로드된 MedLLaMA 모델
+            tokenizer: 모델에 대한 토크나이저
+            temperature: 샘플링 온도 (0-1)
+            max_tokens: 최대 생성 토큰 수
+            
+        Returns:
+            생성된 텍스트 응답 또는 오류 시 None
+        """
+        try:
+            logger.info("MedLLaMA 모델로 응답 생성 시작")
+            
+            # 입력 토큰화
+            tokens = tokenizer.encode(prompt, return_tensors="pt")
+            
+            # GPU 사용 가능한 경우 텐서를 GPU로 이동
+            if torch.cuda.is_available() and self.medllama_device == "cuda":
+                tokens = tokens.to("cuda")
+            
+            # 모델이 이미 GPU에 있는지 확인
+            device = next(model.parameters()).device
+            if device.type != tokens.device.type:
+                tokens = tokens.to(device)
+            
+            # 응답 생성
+            with torch.no_grad():
+                output = model.generate(
+                    tokens,
+                    max_new_tokens=max_tokens,
+                    temperature=temperature,
+                    top_p=0.95,
+                    top_k=50,
+                    do_sample=temperature > 0.01,  # 확률적 샘플링 여부
+                    pad_token_id=tokenizer.eos_token_id
+                )
+            
+            # 생성된 텍스트 디코딩 (프롬프트 제외)
+            response = tokenizer.decode(output[0][tokens.shape[1]:], skip_special_tokens=True)
+            
+            logger.info("MedLLaMA 응답 생성 완료")
+            return response
+        
+        except Exception as e:
+            logger.error(f"MedLLaMA 응답 생성 중 오류 발생: {e}", exc_info=True)
+            return None
+
+    def _hybrid_llm_call(self, prompt: str, temperature: float = 0.7, max_tokens: int = 2048) -> Optional[str]:
+        """Hybrid 모드: 의료 관련 프롬프트는 MedLLaMA로, 일반 프롬프트는 Gemini로 처리
+        
+        Args:
+            prompt: 모델에 전달할 프롬프트 텍스트
+            temperature: 응답 다양성 조절 (0-1)
+            max_tokens: 최대 생성 토큰 수
+            
+        Returns:
+            생성된 응답 텍스트 또는 오류 시 None
+        """
+        try:
+            # 프롬프트가 의료 관련인지 판단
+            is_medical = self._is_medical_prompt(prompt)
+            
+            # 결과 로깅
+            if is_medical:
+                logger.info("의료 관련 프롬프트로 판단됨: MedLLaMA 모델 사용")
+                
+                # MedLLaMA 클라이언트가 있는지 확인
+                if "medllama" not in self.llm_clients:
+                    logger.warning("MedLLaMA 클라이언트가 없습니다. Gemini로 대체합니다.")
+                    current_llm = "gemini"
+                else:
+                    current_llm = "medllama"
+            else:
+                logger.info("일반 프롬프트로 판단됨: Gemini 모델 사용")
+                
+                # Gemini 클라이언트가 있는지 확인
+                if "gemini" not in self.llm_clients:
+                    logger.warning("Gemini 클라이언트가 없습니다. MedLLaMA로 대체합니다.")
+                    current_llm = "medllama"
+                else:
+                    current_llm = "gemini"
+                
+            # 임시로 기본 LLM 변경
+            original_llm = self.primary_llm
+            self.primary_llm = current_llm
+            
+            # 변경된 기본 LLM으로 호출
+            response = None
+            try:
+                # _call_llm 메서드 내부에서 무한 루프 방지를 위해 하이브리드 분기는 건너뛰도록 함
+                if current_llm == "gemini":
+                    gemini_model = self.llm_clients["gemini"]
+                    generation_config = {
+                        "temperature": temperature,
+                        "top_p": 0.95,
+                        "top_k": 40,
+                        "max_output_tokens": max_tokens
+                    }
+                    
+                    response_obj = gemini_model.generate_content(prompt, generation_config=generation_config)
+                    if hasattr(response_obj, 'text'):
+                        response = response_obj.text.strip()
+                else:  # medllama
+                    medllama_client = self.llm_clients["medllama"]
+                    model = medllama_client["model"]
+                    tokenizer = medllama_client["tokenizer"]
+                    
+                    response = self._generate_medllama_response(
+                        prompt, model, tokenizer, temperature, max_tokens
+                    )
+                
+            except Exception as e:
+                logger.error(f"하이브리드 모드에서 {current_llm} 호출 중 오류 발생: {e}")
+                
+            # 기본 LLM 원복
+            self.primary_llm = original_llm
+            
+            # 응답 검증
+            if not response or not response.strip():
+                logger.warning(f"{current_llm} 모델이 유효한 응답을 반환하지 않았습니다.")
+                
+                # 대체 모델로 시도
+                backup_llm = "gemini" if current_llm == "medllama" else "medllama"
+                if backup_llm in self.llm_clients:
+                    logger.info(f"대체 모델 {backup_llm}으로 재시도합니다.")
+                    
+                    # 임시로 기본 LLM 변경
+                    self.primary_llm = backup_llm
+                    
+                    try:
+                        if backup_llm == "gemini":
+                            gemini_model = self.llm_clients["gemini"]
+                            generation_config = {
+                                "temperature": temperature,
+                                "top_p": 0.95,
+                                "top_k": 40,
+                                "max_output_tokens": max_tokens
+                            }
+                            
+                            response_obj = gemini_model.generate_content(prompt, generation_config=generation_config)
+                            if hasattr(response_obj, 'text'):
+                                response = response_obj.text.strip()
+                        else:  # medllama
+                            medllama_client = self.llm_clients["medllama"]
+                            model = medllama_client["model"]
+                            tokenizer = medllama_client["tokenizer"]
+                            
+                            response = self._generate_medllama_response(
+                                prompt, model, tokenizer, temperature, max_tokens
+                            )
+                    except Exception as e:
+                        logger.error(f"대체 모델 {backup_llm} 호출 중 오류 발생: {e}")
+                        
+                    # 기본 LLM 원복
+                    self.primary_llm = original_llm
+            
+            return response
+        
+        except Exception as e:
+            logger.error(f"하이브리드 LLM 호출 중 오류 발생: {e}", exc_info=True)
+            return None
+    
+    def _is_medical_prompt(self, prompt: str) -> bool:
+        """프롬프트가 의료 관련인지 판단
+        
+        Args:
+            prompt: 확인할 프롬프트 텍스트
+            
+        Returns:
+            의료 관련 여부 (True/False)
+        """
+        # 의학 용어, 증상, 질병명 등의 키워드 목록
+        medical_keywords = [
+            "질병", "병", "증상", "진단", "치료", "약물", "의학", "건강", "환자", "의사", 
+            "병원", "수술", "복용", "부작용", "알레르기", "통증", "염증", "감염", "질환",
+            "암", "당뇨", "고혈압", "심장병", "뇌졸중", "천식", "우울증", "불안", "약", "처방",
+            "병리", "해부학", "생리학", "신체", "장기", "혈액", "면역", "유전", "호르몬",
+            "항생제", "백신", "예방", "회복", "응급", "만성", "급성", "MRI", "CT", "X선",
+            "disease", "symptom", "diagnosis", "treatment", "medical", "medicine", "health",
+            "patient", "doctor", "hospital", "surgery", "drug", "side effect", "pain",
+            "inflammation", "infection", "condition", "cancer", "diabetes", "hypertension",
+            "heart disease", "stroke", "asthma", "depression", "anxiety", "prescription",
+            "pathology", "anatomy", "physiology", "organ", "blood", "immune", "genetic",
+            "hormone", "antibiotic", "vaccine", "prevention", "recovery", "emergency"
+        ]
+        
+        # 프롬프트 텍스트 전처리 (소문자 변환)
+        prompt_lower = prompt.lower()
+        
+        # 의료 키워드 출현 횟수 카운트
+        count = sum(1 for keyword in medical_keywords if keyword.lower() in prompt_lower)
+        
+        # 일정 개수 이상의 의료 키워드가 있으면 의료 관련으로 판단
+        # 실제 임계값은 프롬프트 길이나 사용 시나리오에 따라 조정 필요
+        threshold = min(3, max(1, len(prompt.split()) // 50))  # 프롬프트 길이에 비례하여 임계값 결정
+        
+        is_medical = count >= threshold
+        logger.debug(f"프롬프트 의료 관련성 분석: 의료 키워드 {count}개 발견 (임계값: {threshold}) -> {'의료' if is_medical else '일반'} 프롬프트")
+        
+        return is_medical
 
 
     def _parse_llm_json_plan(self, llm_response: str) -> Optional[List[Dict[str, Any]]]:

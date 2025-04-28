@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: medigenius/api:latest
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+      - LLM_PROVIDER=hybrid
+      - LLM_API_KEY=${LLM_API_KEY}
+      - PGVECTOR_HOST=vector-db
+      - PGVECTOR_PORT=5432
+      - PGVECTOR_DB=medigenius
+      - PGVECTOR_USER=postgres
+      - PGVECTOR_PASSWORD=postgres
+    volumes:
+      - ./logs:/app/logs
+      - ./models:/app/models
+    depends_on:
+      - vector-db
+    restart: unless-stopped
+  
+  vector-db:
+    image: ankane/pgvector:latest
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=medigenius
+    volumes:
+      - pgvector-data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/1_schema.sql
+    restart: unless-stopped
+
+volumes:
+  pgvector-data: 

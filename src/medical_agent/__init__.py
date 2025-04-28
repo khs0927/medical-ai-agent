@@ -1,5 +1,18 @@
 # -*- coding: utf-8 -*-
-from .agents import MedicalCoordinatorAgent
-from .tools import analyze_ecg_data_tool, analyze_health_risk_tool
+from src.medical_agent.agents import consult
+from src.medical_agent.tools import (
+    ecg_analysis_tool,
+    risk_score_tool,
+    drug_interaction_tool,
+    guideline_summary_tool,
+    rag_query_tool
+)
 
-__all__ = ["MedicalCoordinatorAgent", "analyze_ecg_data_tool", "analyze_health_risk_tool"] 
+__all__ = [
+    "consult",
+    "ecg_analysis_tool",
+    "risk_score_tool",
+    "drug_interaction_tool",
+    "guideline_summary_tool",
+    "rag_query_tool"
+] 

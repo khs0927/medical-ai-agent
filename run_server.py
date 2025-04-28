@@ -27,9 +27,9 @@ def main():
     
     # 서버 실행
     uvicorn.run(
-        "src.medical_agent.__main__:app", 
+        "fastapi_app.main:app", 
         host="0.0.0.0", 
-        port=8000, 
+        port=8001,
         reload=True
     )
 
