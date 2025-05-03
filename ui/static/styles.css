@@ -1,0 +1,137 @@
+body {
+    font-family: 'Noto Sans KR', Arial, sans-serif;
+    background-color: #f8f9fa;
+    color: #343a40;
+}
+
+.chat-container {
+    margin-bottom: 20px;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.chat-messages {
+    height: 400px;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+.message {
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    border-radius: 10px;
+    max-width: 80%;
+    position: relative;
+    line-height: 1.5;
+}
+
+.message::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    width: 12px;
+    height: 12px;
+}
+
+.message.user {
+    background-color: #007bff;
+    color: white;
+    margin-left: auto;
+    border-bottom-right-radius: 0;
+}
+
+.message.user::after {
+    right: -6px;
+    border-bottom-left-radius: 10px;
+    background-color: #007bff;
+}
+
+.message.agent {
+    background-color: #e9ecef;
+    color: #343a40;
+    margin-right: auto;
+    border-bottom-left-radius: 0;
+}
+
+.message.agent::after {
+    left: -6px;
+    border-bottom-right-radius: 10px;
+    background-color: #e9ecef;
+}
+
+.message.system {
+    background-color: #f8f9fa;
+    color: #6c757d;
+    border: 1px dashed #dee2e6;
+    margin: 0 auto 15px;
+    text-align: center;
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.loading .spinner-border {
+    margin-right: 10px;
+}
+
+.typing-indicator {
+    display: flex;
+    padding: 8px 15px;
+    border-radius: 10px;
+    background-color: #e9ecef;
+    margin-bottom: 15px;
+    width: fit-content;
+}
+
+.typing-indicator span {
+    width: 8px;
+    height: 8px;
+    background-color: #6c757d;
+    border-radius: 50%;
+    margin: 0 2px;
+    display: inline-block;
+    animation: typing 1s infinite ease-in-out;
+}
+
+.typing-indicator span:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+    animation-delay: 0.4s;
+}
+
+@keyframes typing {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-5px);
+    }
+}
+
+.card-footer {
+    background-color: white;
+    border-top: 1px solid #e9ecef;
+    padding: 15px;
+}
+
+.form-check-input:checked {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.btn-primary:hover {
+    background-color: #0069d9;
+    border-color: #0062cc;
+} 
