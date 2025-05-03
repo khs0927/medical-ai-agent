@@ -9,9 +9,13 @@ import os
 import json
 import googleapiclient.discovery
 from googleapiclient.errors import HttpError
+from dotenv import load_dotenv
+
+# 환경 변수 로드
+load_dotenv()
 
 # API 키 설정
-API_KEY = 'AIzaSyB1K2j_4pjhgoyH0zE9VCD8eH0iW3G1g98'
+API_KEY = os.getenv('GOOGLE_API_KEY')
 
 # 의학 관련 사이트 목록
 MEDICAL_SITES = [
@@ -32,6 +36,11 @@ MEDICAL_SITES = [
 
 def create_custom_search_engine():
     """Custom Search Engine 생성"""
+    if not API_KEY:
+        print("Google API 키가 설정되지 않았습니다.")
+        print("API 키를 .env 파일에 다음과 같이 설정해주세요: GOOGLE_API_KEY=your_api_key")
+        return False
+        
     try:
         # CustomSearchAPI 서비스 초기화
         service = googleapiclient.discovery.build(
@@ -39,7 +48,7 @@ def create_custom_search_engine():
         )
         
         print('Google Custom Search API에 연결했습니다.')
-        print(f'API 키: {API_KEY}')
+        print('API 키가 환경변수에서 로드되었습니다.')
         
         # 서비스가 정상적으로 작동하는지 테스트
         search_results = service.cse().list(
@@ -59,7 +68,7 @@ def create_custom_search_engine():
         print('4. \'만들기\' 버튼을 클릭하세요')
         print('5. 생성 후 \'수정\' 버튼을 클릭하고 \'검색 엔진 ID\'를 찾아 복사하세요')
         print('6. 이 CSE ID를 .env 파일에 추가하세요:')
-        print('   GOOGLE_CSE_ID='복사한_CSE_ID'')
+        print('   GOOGLE_CSE_ID=\'복사한_CSE_ID\'')
         
         return True
     
@@ -74,17 +83,21 @@ def create_custom_search_engine():
 def update_env_file(cse_id=None):
     """환경 변수 파일 업데이트"""
     try:
-        env_content = f'ENABLE_WEB_SEARCH=true\nGOOGLE_API_KEY={API_KEY}\n'
+        env_content = 'ENABLE_WEB_SEARCH=true\n'
+        env_content += '# API 키는 별도로 설정해야 합니다\n'
+        env_content += '# GOOGLE_API_KEY=your_google_api_key\n'
         
         if cse_id:
             env_content += f'GOOGLE_CSE_ID={cse_id}\n'
         else:
-            env_content += '# GOOGLE_CSE_ID를 아래에 추가하세요\n# GOOGLE_CSE_ID=your_custom_search_engine_id\n'
+            env_content += '# GOOGLE_CSE_ID를 아래에 추가하세요\n'
+            env_content += '# GOOGLE_CSE_ID=your_custom_search_engine_id\n'
         
         with open('.env', 'w') as f:
             f.write(env_content)
         
         print('.env 파일을 성공적으로 업데이트했습니다.')
+        print('주의: API 키는 반드시 직접 .env 파일에 추가해야 합니다.')
         return True
     
     except Exception as e:
