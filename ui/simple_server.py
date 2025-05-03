@@ -37,10 +37,7 @@ print(f"모드: {'테스트' if TEST_MODE else '실제 AI'}")
 print("종료하려면 Ctrl+C를 누르세요.")
 
 # 실제 AI 에이전트 로드 시도
-# 무조건 테스트 모드로 설정 (API 호환성 문제 해결될 때까지)
-TEST_MODE = True
 print("의료 AI 에이전트 로드 중...")
-print("테스트 모드로 서버를 실행합니다.")
 
 # 아래 주석 처리된 코드는 google-generativeai 패키지 문제가 해결되면 다시 사용
 """
