@@ -54,7 +54,7 @@ class WebRetriever:
         Returns:
             관련 문서 목록
         '''
-        logger.info(f'웹 기반 문서 검색: \'{query}\'')
+        logger.info(f"웹 검색 실행: {query}")
         
         # 캐시 확인
         cache_key = f'web_retrieve_{query}_{limit}'
@@ -165,7 +165,7 @@ class WebRetriever:
             
             # 스크래핑 실패 확인
             if 'error' in scraped_data:
-                logger.warning(f'스크래핑 실패: {url} - {scraped_data[\'error\']}')
+                logger.warning(f"웹 검색 결과 스크랩 실패: {url}")
                 return None
             
             # 타이틀과 콘텐츠 확인
@@ -176,7 +176,7 @@ class WebRetriever:
                 content = scraped_data.get('abstract', '') or scraped_data.get('content', '')
                 # 초록과 본문이 모두 있으면 둘 다 사용
                 if scraped_data.get('abstract') and scraped_data.get('content'):
-                    content = f'Abstract: {scraped_data[\'abstract\']}\n\nContent: {scraped_data[\'content\']}'
+                    content = f"{scraped_data.get('abstract')}\n\n{scraped_data.get('content')}"
             else:
                 content = scraped_data.get('content', '') or scraped_data.get('text', '')
             

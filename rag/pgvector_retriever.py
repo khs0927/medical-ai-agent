@@ -43,7 +43,7 @@ class PGVectorRetriever:
         # 임베딩 모델 로드
         self.embedding_model = self._load_embedding_model()
         
-        logger.info(f'PGVectorRetriever 초기화: {self.db_config[\'host\']}:{self.db_config[\'port\']}/{self.db_config[\'database\']}')
+        logger.info(f"PostgreSQL DB: {self.db_config['host']}:{self.db_config['port']}/{self.db_config['database']}")
 
     def _load_embedding_model(self) -> SentenceTransformer:
         '''임베딩 모델 로드 - 의학 도메인 특화 모델 사용'''
@@ -111,7 +111,7 @@ class PGVectorRetriever:
                 similarity = 1.0 / (1.0 + float(row['distance']))
                 
                 documents.append(Document(
-                    id=f'lit_{row[\'id\']}',
+                    id=f"lit_{row['id']}",
                     title=row['title'],
                     content=row['content'],
                     metadata={
@@ -128,7 +128,7 @@ class PGVectorRetriever:
                 similarity = 1.0 / (1.0 + float(row['distance']))
                 
                 documents.append(Document(
-                    id=f'guide_{row[\'id\']}',
+                    id=f"guide_{row['id']}",
                     title=row['title'],
                     content=row['content'],
                     metadata={
@@ -213,7 +213,7 @@ class PGVectorRetriever:
                     embedding
                     )
                     
-                    doc_id = f'guide_{result[\'id\']}'
+                    doc_id = f"guide_{result['id']}"
                     
                 else:  # 기본 literature
                     # 문헌 저장
@@ -231,7 +231,7 @@ class PGVectorRetriever:
                     embedding
                     )
                     
-                    doc_id = f'lit_{result[\'id\']}'
+                    doc_id = f"lit_{result['id']}"
             
             return doc_id
             
@@ -250,7 +250,7 @@ class PGVectorRetriever:
             
             if 'demographics' in data:
                 demo = data['demographics']
-                embedding_text += f'나이: {demo.get(\'age\')}. 성별: {demo.get(\'gender\')}. '
+                embedding_text += f"환자 성별: {demo.get('gender')}. "
                 
             if 'medical_history' in data:
                 history = data.get('medical_history', [])
@@ -262,8 +262,8 @@ class PGVectorRetriever:
                         elif isinstance(item, str):
                             conditions.append(item)
                     if conditions:
-                        embedding_text += f'병력: {\', \'.join(conditions)}. '
-                        
+                        embedding_text += f"기존 질환: {', '.join(conditions)}"
+            
             if 'medications' in data:
                 meds = data.get('medications', [])
                 if isinstance(meds, list):
@@ -274,7 +274,7 @@ class PGVectorRetriever:
                         elif isinstance(med, str):
                             med_names.append(med)
                     if med_names:
-                        embedding_text += f'약물: {\', \'.join(med_names)}. '
+                        embedding_text += f"복용 약물: {', '.join(med_names)}"
             
             # 임베딩 생성
             embedding = self._create_embedding(embedding_text)

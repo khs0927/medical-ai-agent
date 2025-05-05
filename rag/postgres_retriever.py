@@ -42,7 +42,7 @@ class PostgresRetriever(BaseRetriever):
         # 임베딩 모델 초기화 시도
         self._initialize_embedding_model()
         
-        logger.info(f'PostgreSQL 검색 시스템 초기화 완료: 컬렉션 \'{collection_name}\'')
+        logger.info(f"Postgres 문서 검색: {collection_name}")
 
     def _initialize_embedding_model(self):
         """임베딩 모델 초기화"""
@@ -236,7 +236,7 @@ class PostgresRetriever(BaseRetriever):
         Returns:
             검색 결과 목록
         """
-        logger.info(f'의미론적 검색: \'{query}\', 컬렉션: {self.collection_name}, top_k: {top_k}')
+        logger.info(f"Postgres 문서 검색: {query}")
         
         # 임베딩 모델 사용 가능 여부 확인
         if not self.embedding_model or not self.embedding_tokenizer:
@@ -395,7 +395,7 @@ class PostgresRetriever(BaseRetriever):
         Returns:
             검색 결과 목록
         """
-        logger.info(f'PostgreSQL 키워드 검색: \'{query}\', 컬렉션: {self.collection_name}, top_k: {top_k}')
+        logger.info(f"Postgres 환자 데이터 검색: {query}")
         
         try:
             # 컬렉션 선택에 따라 다른 메서드 호출
@@ -498,6 +498,8 @@ class PostgresRetriever(BaseRetriever):
         Returns:
             문서 ID
         """
+        logger.info(f"Postgres 문서 추가: {document.title}")
+        
         try:
             # 컬렉션에 따라 다른 메서드 호출
             doc_id = None
